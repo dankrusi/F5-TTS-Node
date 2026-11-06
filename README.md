@@ -1,7 +1,8 @@
 # f5-tts-node
 
 Local English and German F5-TTS voice generation in **Node.js**, using native
-ONNX Runtime on **CPU**. No Python, PyTorch, browser, paid API, or external
+ONNX Runtime on **CPU**, or on a **Windows GPU** via DirectML (auto-detected).
+No Python, PyTorch, browser, paid API, or external
 service is needed for synthesis. Internet access is required for the first
 model download. The package is prepared for local installation; it is not
 published to npm.
@@ -9,7 +10,7 @@ published to npm.
 ## Quick start
 
 Requires Node.js 22+ on a platform supported by `onnxruntime-node`. Tested on
-Windows x64 with Node 24. Use pnpm 12.15.0, pinned in `package.json`.
+Windows x64 with Node 24. Use pnpm 12.18.0, pinned in `package.json`.
 The repository allows ONNX Runtime's native installation script through
 `pnpm-workspace.yaml`.
 
@@ -40,6 +41,7 @@ const tts = await F5TTS.create({
   language: 'de', // 'en' selects the separate English model
   cacheDir: './tts-models',
   threads: 6,
+  device: 'auto', // 'auto' | 'gpu' | 'cpu'
   onProgress: event => console.log(event.phase, event.completed, event.total),
 });
 
@@ -82,6 +84,20 @@ generation for cancellation; native inference can stop between denoising steps,
 not in the middle of a step. Progress callbacks run on the Node main thread.
 Do not mutate request objects while queued.
 
+## GPU (Windows, DirectML)
+
+On Windows, `device: 'auto'` (the default) uses the DirectML provider bundled
+with `onnxruntime-node`. No CUDA install is needed, and it works with any DirectX 12
+GPU (NVIDIA, AMD, Intel). The adapter with the most dedicated video memory is
+chosen, so a discrete GPU wins over an integrated one. Override this with
+`gpuDeviceId` (the DXGI adapter index; `listGpuAdapters()` shows them). If
+DirectML fails to load, `auto` falls back to CPU and records the reason in
+`tts.gpuFallbackReason`. `device: 'gpu'` throws instead, and `device: 'cpu'`
+skips the GPU entirely. `tts.backend` is `'directml'` or `'cpu'`, and `tts.gpu`
+names the adapter. When `device` is omitted, the `F5_TTS_DEVICE` environment
+variable (`auto`/`cpu`/`gpu`) applies, e.g. `F5_TTS_DEVICE=cpu pnpm run demo en`.
+The CLI accepts `--device` and `--gpu-device`. Other platforms use CPU.
+
 ## CLI
 
 ```sh
@@ -104,13 +120,14 @@ pnpm add /path/to/f5-tts-node/f5-tts-node-0.1.0.tgz
 
 ES modules and TypeScript declarations are included. No model download occurs
 at package installation or import. `F5TTS.create()` downloads missing models,
-validates their pinned sizes and hashes, then initializes native CPU sessions.
+validates their pinned sizes and hashes, then initializes native GPU (DirectML) or CPU sessions.
 `downloadModels()` can prefetch the assets independently.
 
 ## Implementation and limitations
 
 - Separate pinned FP32 ONNX model sets for English and German, each ~1.45 GB.
-- Native CPU only in this initial version. GPU support is not claimed.
+- GPU acceleration is Windows-only (DirectML). CUDA, CoreML and other providers
+  are not wired up; other platforms run on CPU.
 - All 31 Euler intervals from the exports' fixed 32-point schedule are run.
   Arbitrarily shortening that loop would produce unfinished denoising, so there
   is deliberately no misleading "steps" setting.
@@ -122,8 +139,8 @@ validates their pinned sizes and hashes, then initializes native CPU sessions.
 - `seed` controls the initial noise reproducibly. Floating-point results may
   vary across hardware and ONNX versions.
 - First initialization is expensive; CPU synthesis can be substantially slower
-  than real time. See the actual reports in `output/` instead of assuming GPU
-  benchmark numbers apply to this machine. Allow several GB of RAM per instance.
+  than real time. See the actual reports in `output/` instead of assuming
+  benchmark numbers apply to your machine. Allow several GB of RAM per instance.
 
 ## Verification and provenance
 
@@ -144,7 +161,12 @@ English `Lindenhaven` became `Lyndon Haven`; German `Stadt Lindenhafen` became
 This checks intelligibility, not subjective voice similarity or naturalness.
 Listen to the WAVs to assess voice quality. These CPU timings are too slow for
 real-time playback generation on this machine; queued pre-rendering is possible.
-No GPU speed claim is made.
+
+GPU check (same date and machine, NVIDIA GeForce RTX 4080 SUPER, DirectML,
+English demo): setup 5.02 s, synthesis 21.25 s for 14.306 s of audio (1.49x),
+about 24x faster than the CPU run above. A single-sentence GPU-vs-CPU comparison
+with seed 42 produced the same sample count, a waveform correlation of
+0.9999999992, and a maximum absolute difference of 9.2e-5 (about 3 int16 steps).
 
 The package was packed, installed into an isolated consumer directory, and its
 public import and CLI were verified. The English sample was generated using

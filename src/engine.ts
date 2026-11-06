@@ -5,13 +5,26 @@ import { performance } from 'node:perf_hooks';
 import { downloadModels, MODEL_PRESETS, validateLanguage } from './models.js';
 import { encodeWav, referenceSamples } from './audio.js';
 import { normalizeText, splitText, tokenize, vocabulary } from './text.js';
+import { directMLAvailable, listGpuAdapters, preferredGpuAdapter, type GpuAdapter } from './gpu.js';
 import type { GenerateOptions, GenerationResult, Language, ProgressCallback, SegmentTiming } from './types.js';
+
+export type Device = 'auto' | 'cpu' | 'gpu';
+export type Backend = 'cpu' | 'directml';
+const DEVICES: readonly string[] = ['auto', 'cpu', 'gpu'];
 
 export interface ModelOptions {
   language: Language;
   cacheDir?: string;
-  /** Native CPU inference threads. Default: up to 8. */
+  /** CPU inference threads (also used for any ops DirectML hands back to CPU). Default: up to 8. */
   threads?: number;
+  /**
+   * `auto` (default) uses DirectML on a Windows GPU when one is found and falls back to CPU
+   * if it fails to load; `gpu` requires DirectML; `cpu` never touches the GPU.
+   * When omitted, the F5_TTS_DEVICE environment variable is honoured.
+   */
+  device?: Device;
+  /** DXGI adapter index for DirectML. Default: the hardware adapter with the most dedicated memory. */
+  gpuDeviceId?: number;
   onProgress?: ProgressCallback;
   signal?: AbortSignal;
 }
@@ -31,38 +44,76 @@ function seededNoise(length: number, seed: number): Float32Array {
 }
 const release = (tensors: Iterable<ort.Tensor>) => { for (const tensor of new Set(tensors)) tensor.dispose(); };
 
-/** Native CPU F5-TTS. Instances serialize generation and reuse their loaded models. */
+/** Native F5-TTS on CPU or a Windows GPU (DirectML). Instances serialize generation and reuse their loaded models. */
 export class F5TTS {
   readonly sampleRate = 24000;
-  readonly backend = 'cpu';
+  readonly backend: Backend;
+  /** The DirectML adapter in use when backend is `directml`. */
+  readonly gpu?: GpuAdapter;
+  /** Why `auto` fell back to CPU after trying the GPU, if it did. */
+  readonly gpuFallbackReason?: string;
   readonly language: Language;
   readonly modelRevision: string;
   readonly setupSeconds: number;
   private tail: Promise<unknown> = Promise.resolve();
   private closed = false;
   private disposal?: Promise<void>;
-  private constructor(language: Language, private sessions: ort.InferenceSession[], private vocab: Map<string, number>, setupSeconds: number) {
+  private constructor(language: Language, private sessions: ort.InferenceSession[], private vocab: Map<string, number>, setupSeconds: number,
+    backend: Backend, gpu?: GpuAdapter, gpuFallbackReason?: string) {
     this.language = language; this.modelRevision = MODEL_PRESETS[language].revision; this.setupSeconds = setupSeconds;
+    this.backend = backend; this.gpu = gpu; this.gpuFallbackReason = gpuFallbackReason;
   }
   static async create(options: ModelOptions): Promise<F5TTS> {
     validateLanguage(options.language);
     const threads = options.threads ?? Math.min(8, availableParallelism());
     if (!Number.isInteger(threads) || threads < 1 || threads > 64) throw new Error('threads must be an integer from 1 to 64');
+    const device = options.device ?? (process.env.F5_TTS_DEVICE?.trim().toLowerCase() || 'auto');
+    if (!DEVICES.includes(device)) throw new Error('device must be auto, cpu or gpu');
+    const { gpuDeviceId } = options;
+    if (gpuDeviceId !== undefined && (!Number.isInteger(gpuDeviceId) || gpuDeviceId < 0)) throw new Error('gpuDeviceId must be a non-negative integer');
     const started = performance.now();
     const files = await downloadModels(options);
+    let gpu: GpuAdapter | undefined, fallback: string | undefined;
+    if (device !== 'cpu') {
+      if (!directMLAvailable()) {
+        if (device === 'gpu') throw new Error('GPU inference requires Windows and the DirectML build of onnxruntime-node');
+      } else if (gpuDeviceId !== undefined) {
+        gpu = (await listGpuAdapters()).find(adapter => adapter.index === gpuDeviceId)
+          ?? { index: gpuDeviceId, name: `DXGI adapter ${gpuDeviceId}`, vendorId: 0, dedicatedMemoryBytes: 0, software: false };
+      } else {
+        gpu = await preferredGpuAdapter();
+        if (!gpu && device === 'gpu') throw new Error('No hardware GPU adapter was found for DirectML');
+      }
+    }
+    if (gpu) {
+      try {
+        return await F5TTS.load(options, files, threads, started, gpu);
+      } catch (error) {
+        options.signal?.throwIfAborted();
+        if (device === 'gpu') throw error;
+        fallback = `DirectML on ${gpu.name} failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+    return F5TTS.load(options, files, threads, started, undefined, fallback);
+  }
+  private static async load(options: ModelOptions, files: string[], threads: number, started: number, gpu?: GpuAdapter, fallback?: string): Promise<F5TTS> {
     const sessions: ort.InferenceSession[] = [];
     try {
       for (let i = 0; i < 3; i++) {
         options.signal?.throwIfAborted();
         options.onProgress?.({ phase: 'load', language: options.language, file: files[i], completed: i, total: 3 });
         sessions.push(await ort.InferenceSession.create(files[i], {
-          executionProviders: ['cpu'], intraOpNumThreads: threads, interOpNumThreads: 1,
-          executionMode: 'sequential', graphOptimizationLevel: 'all', logSeverityLevel: 3,
+          // CPU stays listed after DirectML so any op it cannot run is assigned to CPU.
+          executionProviders: gpu ? [{ name: 'dml', deviceId: gpu.index }, 'cpu'] : ['cpu'],
+          intraOpNumThreads: threads, interOpNumThreads: 1, executionMode: 'sequential', graphOptimizationLevel: 'all', logSeverityLevel: 3,
+          // DirectML requires memory patterns off (and sequential execution, set above).
+          ...(gpu ? { enableMemPattern: false } : {}),
         }));
       }
       if (sessions[0].inputNames.length !== 3 || sessions[0].outputNames.length !== 8 || sessions[1].inputNames.length !== 8 || sessions[1].outputNames.length !== 2 || sessions[2].inputNames.length !== 2) throw new Error('Unsupported F5 ONNX graph contract');
       options.signal?.throwIfAborted();
-      const instance = new F5TTS(options.language, sessions, vocabulary(await readFile(files[3], 'utf8')), (performance.now() - started) / 1000);
+      const instance = new F5TTS(options.language, sessions, vocabulary(await readFile(files[3], 'utf8')), (performance.now() - started) / 1000,
+        gpu ? 'directml' : 'cpu', gpu, fallback);
       options.onProgress?.({ phase: 'ready', language: options.language, completed: 1, total: 1 });
       return instance;
     } catch (error) { await Promise.all(sessions.map(session => session.release())); throw error; }

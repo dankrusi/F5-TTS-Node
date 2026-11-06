@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname, basename } from 'node:path';
-import { decodeWav, encodeWav, resample, downloadModels } from '../dist/index.js';
+import { decodeWav, encodeWav, resample, downloadModels, F5TTS } from '../dist/index.js';
 import { referenceSamples } from '../dist/audio.js';
 import { normalizeText, vocabulary, tokenize, splitText } from '../dist/text.js';
 
@@ -47,4 +47,8 @@ test('model download honors cancellation before making network requests', async 
     assert.equal(dirname(resolve(directory)),resolve(tmpdir()));assert(basename(directory).startsWith('f5-node-test-'));
     await rm(directory,{recursive:true,force:true});
   }
+});
+test('device options are validated before any model download', async () => {
+  await assert.rejects(F5TTS.create({language:'en',device:'tpu'}),/device must be auto, cpu or gpu/);
+  await assert.rejects(F5TTS.create({language:'en',device:'gpu',gpuDeviceId:-1}),/gpuDeviceId/);
 });

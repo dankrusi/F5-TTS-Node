@@ -6,15 +6,18 @@ import { F5TTS } from './engine.js';
 import { downloadModels, validateLanguage } from './models.js';
 import type { Progress } from './types.js';
 
-const help = `f5-tts-node: local English/German F5-TTS (native CPU, no Python)
+const help = `f5-tts-node: local English/German F5-TTS (native CPU or Windows GPU, no Python)
 
   f5-tts-node download --language en|de [--cache-dir PATH]
   f5-tts-node generate --language en|de --reference voice.wav
     --reference-text "Exact words in voice.wav" --text "Words to speak"
     --output result.wav [--speed 1] [--seed 42] [--threads 8]
+    [--device auto|cpu|gpu] [--gpu-device N]
 
 Text may instead come from --text-file and --reference-text-file (UTF-8).
 Reference: 1–15 seconds of PCM WAV, preferably 5–10 seconds of clean speech.
+--device auto (default) uses a Windows GPU via DirectML when available, else CPU.
+--gpu-device picks a DXGI adapter index (default: largest dedicated memory).
 Outputs a WAV and an adjacent JSON file containing text, timing and model provenance.
 Models download on first use (~1.45 GB per language) and are cached. Model weights
 are CC-BY-NC-4.0; see NOTICE.md. Generation is local after download.
@@ -24,7 +27,7 @@ async function main() {
     help: { type: 'boolean', short: 'h' }, language: { type: 'string' }, 'cache-dir': { type: 'string' },
     reference: { type: 'string' }, 'reference-text': { type: 'string' }, 'reference-text-file': { type: 'string' },
     text: { type: 'string' }, 'text-file': { type: 'string' }, output: { type: 'string' }, speed: { type: 'string' },
-    seed: { type: 'string' }, threads: { type: 'string' }, quiet: { type: 'boolean' },
+    seed: { type: 'string' }, threads: { type: 'string' }, device: { type: 'string' }, 'gpu-device': { type: 'string' }, quiet: { type: 'boolean' },
   } });
   if (values.help || !positionals.length) { console.log(help); return; }
   const command = positionals[0];
@@ -48,14 +51,15 @@ async function main() {
     if (!values.reference || !values.output) throw new Error('--reference and --output are required');
     const text = await readText(values.text, values['text-file']);
     const referenceText = await readText(values['reference-text'], values['reference-text-file']);
-    const tts = await F5TTS.create({ language, cacheDir: values['cache-dir'], threads: values.threads ? Number(values.threads) : undefined, onProgress, signal: controller.signal });
+    const tts = await F5TTS.create({ language, cacheDir: values['cache-dir'], threads: values.threads ? Number(values.threads) : undefined,
+      device: values.device as 'auto' | 'cpu' | 'gpu' | undefined, gpuDeviceId: values['gpu-device'] ? Number(values['gpu-device']) : undefined, onProgress, signal: controller.signal });
     try {
       const result = await tts.generate({ text, referenceText, referenceAudio: values.reference,
         speed: values.speed ? Number(values.speed) : undefined, seed: values.seed ? Number(values.seed) : undefined, onProgress, signal: controller.signal });
       const output = resolve(values.output); await mkdir(dirname(output), { recursive: true });
       await writeFile(output, result.wav);
       const report = { output, language, text, synthetic: true, sampleRate: result.sampleRate, duration: result.duration,
-        segments: result.segments, setupSeconds: tts.setupSeconds, ...result.timings, backend: tts.backend, modelRevision: tts.modelRevision };
+        segments: result.segments, setupSeconds: tts.setupSeconds, ...result.timings, backend: tts.backend, gpu: tts.gpu?.name, gpuFallbackReason: tts.gpuFallbackReason, modelRevision: tts.modelRevision };
       await writeFile(output + '.json', JSON.stringify(report, null, 2) + '\n');
       console.log(JSON.stringify(report, null, 2));
     } finally { await tts.dispose(); }

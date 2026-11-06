@@ -17,7 +17,7 @@ for(const language of requested==='both'?['en','de']:[requested]){
  const tts=await F5TTS.create({language,cacheDir:process.env.F5_TTS_CACHE_DIR||resolve('.cache'),onProgress:progress});
  try{
   const result=await tts.generate({text:copy[language],referenceText:reference.transcript,referenceAudio:fileURLToPath(new URL(`./references/${language}.wav`,import.meta.url)),seed:42,onProgress:progress});
-  const report={language,text:copy[language],fictional:true,sampleRate:result.sampleRate,duration:result.duration,segments:result.segments,setupSeconds:tts.setupSeconds,...result.timings,backend:tts.backend,modelRevision:tts.modelRevision,reference:reference.speaker};
+  const report={language,text:copy[language],fictional:true,sampleRate:result.sampleRate,duration:result.duration,segments:result.segments,setupSeconds:tts.setupSeconds,...result.timings,backend:tts.backend,gpu:tts.gpu?.name,gpuFallbackReason:tts.gpuFallbackReason,modelRevision:tts.modelRevision,reference:reference.speaker};
   await writeFile(resolve(output,`news-${language}.wav`),result.wav);await writeFile(resolve(output,`news-${language}.json`),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify(report,null,2));
  }finally{await tts.dispose()}
