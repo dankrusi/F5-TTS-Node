@@ -21,6 +21,20 @@ pnpm run demo de
 pnpm run demo en
 ```
 
+Force a device with simple flags (works for either language or `both`):
+
+```sh
+pnpm run demo both --cpu
+pnpm run demo both --gpu
+pnpm run demo de --gpu --gpu-device 0
+pnpm run demo en --device auto
+```
+
+`--cpu` skips GPU detection. `--gpu` requires DirectML and fails if GPU
+initialization fails. Use only one of `--cpu`, `--gpu`, or `--device`;
+an explicit flag overrides `F5_TTS_DEVICE`. The demo prints the selected
+backend before generating audio. `pnpm run demo --help` lists the options.
+
 Listen to `output/news-de.wav` and `output/news-en.wav`. The corresponding JSON
 files include fictional copy, generation time, duration and chunk timings.
 The examples include downloaded, attributed narrator references, so no
@@ -96,7 +110,11 @@ DirectML fails to load, `auto` falls back to CPU and records the reason in
 skips the GPU entirely. `tts.backend` is `'directml'` or `'cpu'`, and `tts.gpu`
 names the adapter. When `device` is omitted, the `F5_TTS_DEVICE` environment
 variable (`auto`/`cpu`/`gpu`) applies, e.g. `F5_TTS_DEVICE=cpu pnpm run demo en`.
-The CLI accepts `--device` and `--gpu-device`. Other platforms use CPU.
+The CLI and demo accept `--cpu`, `--gpu`, `--device`, and `--gpu-device`.
+For example, append `--cpu` or `--gpu` to `f5-tts-node generate ...`.
+DirectML may still assign unsupported individual operations to CPU; forced GPU
+mode prevents switching the entire pipeline to CPU after a GPU loading failure.
+Other platforms use CPU in automatic mode; forced GPU reports an error.
 
 ## CLI
 

@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { F5TTS } from './engine.js';
 import { downloadModels, validateLanguage } from './models.js';
 import type { Progress } from './types.js';
+import { deviceOptions } from './device-options.js';
 
 const help = `f5-tts-node: local English/German F5-TTS (native CPU or Windows GPU, no Python)
 
@@ -12,11 +13,13 @@ const help = `f5-tts-node: local English/German F5-TTS (native CPU or Windows GP
   f5-tts-node generate --language en|de --reference voice.wav
     --reference-text "Exact words in voice.wav" --text "Words to speak"
     --output result.wav [--speed 1] [--seed 42] [--threads 8]
-    [--device auto|cpu|gpu] [--gpu-device N]
+    [--cpu | --gpu | --device auto|cpu|gpu] [--gpu-device N]
 
 Text may instead come from --text-file and --reference-text-file (UTF-8).
 Reference: 1–15 seconds of PCM WAV, preferably 5–10 seconds of clean speech.
 --device auto (default) uses a Windows GPU via DirectML when available, else CPU.
+--cpu forces CPU. --gpu requires DirectML and fails if GPU initialization fails.
+Explicit device flags override F5_TTS_DEVICE. With no flag, the environment applies.
 --gpu-device picks a DXGI adapter index (default: largest dedicated memory).
 Outputs a WAV and an adjacent JSON file containing text, timing and model provenance.
 Models download on first use (~1.45 GB per language) and are cached. Model weights
@@ -28,10 +31,12 @@ async function main() {
     reference: { type: 'string' }, 'reference-text': { type: 'string' }, 'reference-text-file': { type: 'string' },
     text: { type: 'string' }, 'text-file': { type: 'string' }, output: { type: 'string' }, speed: { type: 'string' },
     seed: { type: 'string' }, threads: { type: 'string' }, device: { type: 'string' }, 'gpu-device': { type: 'string' }, quiet: { type: 'boolean' },
+    cpu: { type: 'boolean' }, gpu: { type: 'boolean' },
   } });
   if (values.help || !positionals.length) { console.log(help); return; }
   const command = positionals[0];
   if (positionals.length !== 1 || !['download','generate'].includes(command)) throw new Error('Expected download or generate. Use --help.');
+  const selectedDevice = deviceOptions(values);
   const language = values.language || ''; validateLanguage(language);
   const controller = new AbortController();
   const interrupt = () => controller.abort(new Error('Cancelled'));
@@ -52,7 +57,7 @@ async function main() {
     const text = await readText(values.text, values['text-file']);
     const referenceText = await readText(values['reference-text'], values['reference-text-file']);
     const tts = await F5TTS.create({ language, cacheDir: values['cache-dir'], threads: values.threads ? Number(values.threads) : undefined,
-      device: values.device as 'auto' | 'cpu' | 'gpu' | undefined, gpuDeviceId: values['gpu-device'] ? Number(values['gpu-device']) : undefined, onProgress, signal: controller.signal });
+      ...selectedDevice, onProgress, signal: controller.signal });
     try {
       const result = await tts.generate({ text, referenceText, referenceAudio: values.reference,
         speed: values.speed ? Number(values.speed) : undefined, seed: values.seed ? Number(values.seed) : undefined, onProgress, signal: controller.signal });

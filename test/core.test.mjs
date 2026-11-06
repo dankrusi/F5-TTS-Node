@@ -6,6 +6,18 @@ import { join, resolve, dirname, basename } from 'node:path';
 import { decodeWav, encodeWav, resample, downloadModels, F5TTS } from '../dist/index.js';
 import { referenceSamples } from '../dist/audio.js';
 import { normalizeText, vocabulary, tokenize, splitText } from '../dist/text.js';
+import { deviceOptions } from '../dist/device-options.js';
+
+test('CLI and demo device flags resolve explicit choices and reject conflicts', () => {
+  assert.deepEqual(deviceOptions({cpu:true}),{device:'cpu',gpuDeviceId:undefined});
+  assert.deepEqual(deviceOptions({gpu:true,'gpu-device':'0'}),{device:'gpu',gpuDeviceId:0});
+  assert.deepEqual(deviceOptions({device:'auto'}),{device:'auto',gpuDeviceId:undefined});
+  assert.equal(deviceOptions({}).device,undefined,'No explicit choice preserves environment handling');
+  for(const flags of [{cpu:true,gpu:true},{cpu:true,device:'cpu'},{gpu:true,device:'auto'}])assert.throws(()=>deviceOptions(flags),/only one/);
+  for(const adapter of ['', '-1', '1.5', 'nope', '9007199254740992'])assert.throws(()=>deviceOptions({'gpu-device':adapter}),/non-negative integer/);
+  assert.throws(()=>deviceOptions({device:'cpu','gpu-device':'0'}),/CPU mode/);
+  assert.throws(()=>deviceOptions({device:'tpu'}),/auto, cpu or gpu/);
+});
 
 test('WAV roundtrip preserves timing, waveform, and clipping bounds', () => {
   const samples=Float32Array.from({length:24000},(_,i)=>.2*Math.sin(2*Math.PI*440*i/24000));
