@@ -9,14 +9,15 @@ published to npm.
 ## Quick start
 
 Requires Node.js 22+ on a platform supported by `onnxruntime-node`. Tested on
-Windows x64 with Node 24. On Windows PowerShell use `npm.cmd` if execution
-policy blocks `npm.ps1`.
+Windows x64 with Node 24. Use pnpm 12.15.0, pinned in `package.json`.
+The repository allows ONNX Runtime's native installation script through
+`pnpm-workspace.yaml`.
 
 ```sh
-npm install
-npm run build
-npm run demo -- de
-npm run demo -- en
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm run demo de
+pnpm run demo en
 ```
 
 Listen to `output/news-de.wav` and `output/news-en.wav`. The corresponding JSON
@@ -96,9 +97,9 @@ Progress goes to stderr; the result report goes to stdout. An adjacent
 ## Install into another project later
 
 ```sh
-npm pack
+pnpm pack
 # In the consuming project:
-npm install /path/to/f5-tts-node/f5-tts-node-0.1.0.tgz
+pnpm add /path/to/f5-tts-node/f5-tts-node-0.1.0.tgz
 ```
 
 ES modules and TypeScript declarations are included. No model download occurs
@@ -150,9 +151,9 @@ public import and CLI were verified. The English sample was generated using
 that installed package. Raw reports are in `output/news-*.json` and
 `output/verification-*.json` in this working directory (not bundled in the tarball).
 
-`npm test` checks audio decoding/encoding, anti-aliasing resampling, silent
+`pnpm test` checks audio decoding/encoding, anti-aliasing resampling, silent
 reference rejection, German vocabulary handling, chunk preservation and
-cancellation. `npm run demo -- both` performs real neural inference and writes
+cancellation. `pnpm run demo both` performs real neural inference and writes
 the two fictional news recordings. `examples/download-references.mjs` can
 refresh the bundled reference clips from their original dataset rows.
 

@@ -1,6 +1,7 @@
 {
   "name": "f5-tts-node",
   "version": "0.1.0",
+  "packageManager": "pnpm@12.15.0",
   "description": "Local English and German F5-TTS voice generation in Node.js using native ONNX Runtime",
   "repository": { "type": "git", "url": "https://github.com/dankrusi/F5-TTS-Node.git" },
   "homepage": "https://github.com/dankrusi/F5-TTS-Node#readme",
@@ -14,9 +15,9 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test test/*.test.mjs",
+    "test": "pnpm run build && node --test test/*.test.mjs",
     "demo": "node examples/news.mjs",
-    "prepack": "npm run build"
+    "prepack": "pnpm run build"
   },
   "license": "MIT",
   "dependencies": { "onnxruntime-node": "1.31.1" },
