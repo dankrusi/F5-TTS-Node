@@ -15,6 +15,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./references/*": "./examples/references/*",
+    "./models.json": "./dist/models.json",
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
