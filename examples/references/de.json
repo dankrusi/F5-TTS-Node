@@ -1,0 +1,17 @@
+{
+  "language": "de",
+  "dataset": "Thorsten-Voice/TV-44kHz-Full",
+  "config": "TV-2022.10-Neutral",
+  "split": "train",
+  "row": 5,
+  "speaker": "Thorsten Müller",
+  "license": "CC0-1.0",
+  "original": "https://github.com/thorstenMueller/Thorsten-Voice",
+  "transcript": "als hauptlieferant gilt die konventionelle landwirtschaft mit phosphorhaltigen düngemitteln.",
+  "datasetRowId": "dd01c488-10f3-a683-00cf-4d215f4d9b19---3df17877aafbf59917014184f03b607a",
+  "sourceUrl": "https://datasets-server.huggingface.co/rows?dataset=Thorsten-Voice/TV-44kHz-Full&config=TV-2022.10-Neutral&split=train&offset=5&length=1",
+  "audioSourcePath": "/cached-assets/Thorsten-Voice/TV-44kHz-Full/--/2b61b98fa8f99abd1ce1587b4bf413d6ebc217d5/--/TV-2022.10-Neutral/train/5/audio/audio.wav",
+  "sha256": "c7edbaa15a64bc5d30f9cfded436fc2d26dec5b4a0b6b3de67c07d5152a413ff",
+  "sampleRate": 24000,
+  "note": "Resampled to 24 kHz mono PCM16 for F5-TTS. Narrator reference, not a news-anchor endorsement."
+}

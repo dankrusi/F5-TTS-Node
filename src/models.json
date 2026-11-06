@@ -1,0 +1,54 @@
+{
+  "en": {
+    "repo": "nsarang/F5-TTS-ONNX",
+    "revision": "2e7e47e103a565c85dcd32141b6b11eeeb57eee6",
+    "files": [
+      {
+        "path": "onnx/encoder_fp32.onnx",
+        "size": 68549853,
+        "sha256": "e71d3ed14e90ba3fc1e83560512e86a771e25b6f0be7789b2cf53a5c9ba5617d"
+      },
+      {
+        "path": "onnx/transformer_fp32.onnx",
+        "size": 1321718282,
+        "sha256": "c63aeb96953ccae551df6717d892f73a8408e59f1a6fe8edc2aed8063bd195b8"
+      },
+      {
+        "path": "onnx/decoder_fp32.onnx",
+        "size": 62550703,
+        "sha256": "a16fea891beb4889b47e5987b80c841bb996beaccc1d1fe27a1f9323a089a6da"
+      },
+      {
+        "path": "vocab.txt",
+        "size": 13800,
+        "sha256": "2a05f992e00af9b0bd3800a8d23e78d520dbd705284ed2eedb5f4bd29398fa3c"
+      }
+    ]
+  },
+  "de": {
+    "repo": "nibor1896/F5-TTS-German-ONNX",
+    "revision": "6d46e3a9dbdbddf022212619190fb7bb6c9a2240",
+    "files": [
+      {
+        "path": "F5_Preprocess.onnx",
+        "size": 68533663,
+        "sha256": "42c390abc243e50ca2bbf74ce379bb0356303c05a995e25f784765054e77d065"
+      },
+      {
+        "path": "F5_Transformer.onnx",
+        "size": 1322291099,
+        "sha256": "bc0d9ca953359ad0e79b1002985792f98ff91b1407e6ec514db4778518479fec"
+      },
+      {
+        "path": "F5_Decode.onnx",
+        "size": 62546910,
+        "sha256": "b28113f9d35a4d2863417cbb2c1428a771eec818806da40cd12a66ca6ee895d7"
+      },
+      {
+        "path": "vocab.txt",
+        "size": 13803,
+        "sha256": "124832ff32c3cbdd33d24966396449793a1c21a71abb70f89f1a0ba2d03fd0d6"
+      }
+    ]
+  }
+}

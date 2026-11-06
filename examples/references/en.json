@@ -1,0 +1,17 @@
+{
+  "language": "en",
+  "dataset": "MikhailT/lj-speech",
+  "config": "default",
+  "split": "full",
+  "row": 3,
+  "speaker": "Linda Johnson",
+  "license": "CC-BY-4.0 (mirror); original LJ Speech recordings are public domain",
+  "original": "https://keithito.com/LJ-Speech-Dataset/",
+  "transcript": "produced the block books, which were the immediate predecessors of the true printed book,",
+  "datasetRowId": "lj-001-0004.wav",
+  "sourceUrl": "https://datasets-server.huggingface.co/rows?dataset=MikhailT/lj-speech&config=default&split=full&offset=3&length=1",
+  "audioSourcePath": "/cached-assets/MikhailT/lj-speech/--/f04bb20ddce4b1dbcfb95b10e5573121d871bf5f/--/default/full/3/audio/audio.wav",
+  "sha256": "3328293a46760712fedf74f6666c3527af59449341552a373dd895787e46d0fe",
+  "sampleRate": 24000,
+  "note": "Resampled to 24 kHz mono PCM16 for F5-TTS. Narrator reference, not a news-anchor endorsement."
+}
